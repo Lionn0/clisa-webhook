@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 import hmac
 import hashlib
 import json
@@ -20,6 +20,7 @@ APP_SECRET = os.getenv("APP_SECRET")  # Clave secreta de la app (Configuración 
 INSTAGRAM_TOKEN = os.getenv("INSTAGRAM_TOKEN")  # Token de acceso de Instagram
 FACEBOOK_TOKEN = os.getenv("FACEBOOK_TOKEN")  # Token de acceso de Facebook
 CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY")  # API Key de Anthropic
+DOWNLOAD_SECRET = os.getenv("DOWNLOAD_SECRET", "clisa-descarga-2026")  # texto que TÚ inventas, para poder descargar el Excel de forma segura
 EXCEL_FILE = "mensajes_clisa.xlsx"
 
 # Palabras clave para pre-filtrado
@@ -224,6 +225,23 @@ def webhook_post():
 def health():
     """Health check para Render"""
     return jsonify({"status": "healthy"}), 200
+
+@app.route("/descargar-excel", methods=["GET"])
+def descargar_excel():
+    """
+    Descarga el archivo Excel actual del servidor.
+    Solo funciona si se manda el parámetro correcto ?clave=TU_DOWNLOAD_SECRET
+    para que no cualquiera pueda descargarlo con solo saber la URL.
+    Ejemplo: https://clisa-webhook.onrender.com/descargar-excel?clave=clisa-descarga-2026
+    """
+    clave = request.args.get("clave")
+    if clave != DOWNLOAD_SECRET:
+        return "No autorizado", 403
+
+    if not os.path.exists(EXCEL_FILE):
+        return "El archivo Excel todavía no existe en el servidor", 404
+
+    return send_file(EXCEL_FILE, as_attachment=True, download_name="mensajes_clisa.xlsx")
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)), debug=False)
